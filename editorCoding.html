@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Editor - Pencarian dengan Tombol Cari</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            background: #2d2d2d;
+            padding: 12px 20px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-bottom: 2px solid #007acc;
+            flex-wrap: wrap;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 500px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #3c3c3c;
+            border-radius: 6px;
+            padding: 4px;
+            border: 1px solid #555;
+        }
+
+        .search-container:focus-within {
+            border-color: #007acc;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+        }
+
+        .search-icon {
+            color: #888;
+            padding-left: 8px;
+            font-size: 16px;
+        }
+
+        .search-container input {
+            flex: 1;
+            padding: 8px 8px 8px 4px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-container input::placeholder {
+            color: #888;
+        }
+
+        .search-btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .search-btn:hover {
+            background: #0098ff;
+        }
+
+        .match-info {
+            color: #9cdcfe;
+            font-size: 14px;
+            background: #3c3c3c;
+            padding: 4px 12px;
+            border-radius: 16px;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 4px;
+            background: #3c3c3c;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: #ccc;
+            width: 30px;
+            height: 30px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: #505050;
+            color: white;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 9px;
+            cursor: pointer;
+            font-size: 9px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #ff5f52;
+        }
+
+        .editor-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            background: #1e1e1e;
+            position: relative;
+        }
+
+        .line-numbers {
+            background: #2d2d2d;
+            padding: 12px 0 12px 12px;
+            text-align: right;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 8px;
+            line-height: 1.6;
+            color: #858585;
+            min-width: 25px;
+            user-select: none;
+            border-right: 2px solid #3c3c3c;
+            white-space: pre;
+            overflow-y: hidden;
+        }
+
+        .code-area {
+            flex: 1;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 8px;
+            line-height: 1.6;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            resize: none;
+            outline: none;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        .code-output {
+            flex: 1;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 8px;
+            line-height: 1.6;
+            background: #1e1e1e;
+            overflow: auto;
+            white-space: pre;
+            margin: 0;
+            position: relative;
+        }
+
+        /* Syntax highlighting */
+        .keyword { color: #569cd6; font-weight: bold; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; font-style: italic; }
+        .function { color: #dcdcaa; }
+        .number { color: #b5cea8; }
+        .operator { color: #d4d4d4; }
+        .class-name { color: #4ec9b0; }
+        .property { color: #9cdcfe; }
+
+        /* Search highlight */
+        .search-highlight {
+            background-color: rgba(255, 80, 80, 0.7);
+            border-radius: 3px;
+            box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.5);
+            color: #ffffff;
+            font-weight: bold;
+            padding: 0 2px;
+            margin: 0 -2px;
+            transition: all 0.3s ease;
+            scroll-margin: 100px;
+        }
+
+        /* Highlight untuk hasil yang aktif */
+        .search-highlight.active {
+            background-color: rgba(255, 200, 0, 0.9);
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.8);
+            color: #000000;
+            font-weight: bold;
+            transform: scale(1.05);
+            position: relative;
+            z-index: 10;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.8); }
+            50% { box-shadow: 0 0 0 6px rgba(255, 215, 0, 0.4); }
+            100% { box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.8); }
+        }
+
+        .tab-container {
+            display: flex;
+            background: #2d2d2d;
+            border-bottom: 2px solid #3c3c3c;
+        }
+
+        .tab {
+            padding: 10px 25px;
+            background: #2d2d2d;
+            color: #969696;
+            cursor: pointer;
+            border-right: 1px solid #3c3c3c;
+            font-size: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: #3d3d3d;
+            color: #fff;
+        }
+
+        .tab.active {
+            background: #1e1e1e;
+            color: #fff;
+            border-bottom: 3px solid #007acc;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .status-bar {
+            background: #007acc;
+            color: white;
+            padding: 6px 15px;
+            font-size: 13px;
+            display: flex;
+            gap: 25px;
+            font-weight: 500;
+        }
+
+        .shortcut-hint {
+            color: #ccc;
+            font-size: 12px;
+            margin-left: auto;
+        }
+
+        .typing-indicator {
+            color: #ffaa00;
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }
+
+        .typing-indicator.show {
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+    <div class="tab-container">
+        <div class="tab active" onclick="switchMode('editor')">📝 Editor Mode</div>
+        <div class="tab" onclick="switchMode('preview')">👁️ Preview Mode</div>
+    </div>
+
+    <div class="toolbar">
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" 
+                   id="searchInput" 
+                   placeholder="Ketik kata lalu tekan Cari atau Enter" 
+                   onkeyup="checkEnter(event)">
+            <button class="search-btn" onclick="performSearch()">Cari</button>
+        </div>
+
+        <div class="nav-buttons">
+            <button class="nav-btn" onclick="focusNextMatch()" title="Next (F3 atau Enter)" id="nextBtn" disabled>▼</button>
+            <button class="nav-btn" onclick="focusPrevMatch()" title="Previous (Shift+F3)" id="prevBtn" disabled>▲</button>
+        </div>
+
+        <span class="match-info" id="matchCount">
+            <span id="currentMatch">0</span>/<span id="totalMatches">0</span> hasil
+        </span>
+
+        <button class="clear-btn" onclick="clearSearch()">✖ Clear</button>
+        
+        <span class="shortcut-hint">Enter: cari | F3: next | Shift+F3: prev</span>
+        <span class="typing-indicator" id="typingIndicator">⏳ Ketik dulu...</span>
+    </div>
+
+    <!-- Editor Panel -->
+    <div id="editorPanel" class="editor-container">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <textarea class="code-area" id="codeInput" 
+                  oninput="updateLineNumbers(); updatePreview();" 
+                  placeholder="Tulis kode Anda di sini...">
+
+</textarea>
+    </div>
+
+    <!-- Preview Panel -->
+    <div id="previewPanel" class="editor-container hidden">
+        <div class="line-numbers" id="previewLineNumbers">1</div>
+        <pre class="code-output" id="codePreview"></pre>
+    </div>
+
+    <div class="status-bar">
+        <span>🔵 JavaScript</span>
+        <span>📊 Baris: <span id="lineCount">1</span></span>
+        <span>📍 Baris <span id="currentLine">1</span></span>
+    </div>
+
+    <script>
+        const codeInput = document.getElementById('codeInput');
+        const lineNumbers = document.getElementById('lineNumbers');
+        const previewLineNumbers = document.getElementById('previewLineNumbers');
+        const codePreview = document.getElementById('codePreview');
+        const searchInput = document.getElementById('searchInput');
+        const currentMatchSpan = document.getElementById('currentMatch');
+        const totalMatchesSpan = document.getElementById('totalMatches');
+        const currentLineSpan = document.getElementById('currentLine');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const nextBtn = document.getElementById('nextBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        
+        let matches = [];
+        let currentMatchIndex = -1;
+        let searchTerm = '';
+        let typingTimer;
+
+        // Mode switching
+        function switchMode(mode) {
+            const editorPanel = document.getElementById('editorPanel');
+            const previewPanel = document.getElementById('previewPanel');
+            const tabs = document.querySelectorAll('.tab');
+            
+            if (mode === 'editor') {
+                editorPanel.classList.remove('hidden');
+                previewPanel.classList.add('hidden');
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+                updateLineNumbers();
+            } else {
+                editorPanel.classList.add('hidden');
+                previewPanel.classList.remove('hidden');
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+                updatePreview();
+            }
+        }
+
+        // Update line numbers
+        function updateLineNumbers() {
+            const lines = codeInput.value.split('\n');
+            const lineCount = lines.length;
+            document.getElementById('lineCount').textContent = lineCount;
+            
+            let lineNumberHtml = '';
+            for (let i = 1; i <= lineCount; i++) {
+                lineNumberHtml += i + '\n';
+            }
+            lineNumbers.innerText = lineNumberHtml;
+            
+            updateCurrentLine();
+        }
+
+        // Update current line based on scroll
+        function updateCurrentLine() {
+            const scrollTop = codeInput.scrollTop;
+            const lineHeight = 22;
+            const currentLine = Math.floor(scrollTop / lineHeight) + 1;
+            currentLineSpan.textContent = currentLine;
+        }
+
+        // Check Enter key
+        function checkEnter(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performSearch();
+            }
+            
+            // Tampilkan indikator bahwa sedang mengetik
+            typingIndicator.classList.add('show');
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                typingIndicator.classList.remove('show');
+            }, 1000);
+        }
+
+        // Perform search (dipanggil saat tombol Cari atau Enter ditekan)
+        function performSearch() {
+            const newSearchTerm = searchInput.value.trim();
+            
+            if (newSearchTerm === '') {
+                clearSearch();
+                return;
+            }
+            
+            searchTerm = newSearchTerm;
+            typingIndicator.classList.remove('show');
+            
+            // Cari matches
+            findMatches();
+            
+            // Update preview dengan highlight
+            updatePreview();
+            
+            // Scroll ke match pertama
+            setTimeout(() => {
+                scrollToCurrentMatch();
+            }, 100);
+            
+            // Enable/disable navigation buttons
+            updateNavButtons();
+        }
+
+        // Find all matches positions
+        function findMatches() {
+            if (searchTerm === '') {
+                matches = [];
+                currentMatchIndex = -1;
+                updateMatchCount();
+                return;
+            }
+
+            const code = codeInput.value;
+            const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
+            matches = [];
+            let match;
+            
+            while ((match = regex.exec(code)) !== null) {
+                matches.push({
+                    index: match.index,
+                    length: match[0].length,
+                    text: match[0]
+                });
+            }
+            
+            currentMatchIndex = matches.length > 0 ? 0 : -1;
+            updateMatchCount();
+        }
+
+        // Update match count display
+        function updateMatchCount() {
+            const total = matches.length;
+            totalMatchesSpan.textContent = total;
+            
+            if (total > 0) {
+                currentMatchSpan.textContent = currentMatchIndex + 1;
+            } else {
+                currentMatchSpan.textContent = '0';
+            }
+            
+            updateNavButtons();
+        }
+
+        // Update navigation buttons state
+        function updateNavButtons() {
+            const hasMatches = matches.length > 0;
+            nextBtn.disabled = !hasMatches;
+            prevBtn.disabled = !hasMatches;
+        }
+
+        // Navigate to next match
+        function focusNextMatch() {
+            if (matches.length === 0) return;
+            currentMatchIndex = (currentMatchIndex + 1) % matches.length;
+            updateMatchCount();
+            scrollToCurrentMatch();
+        }
+
+        // Navigate to previous match
+        function focusPrevMatch() {
+            if (matches.length === 0) return;
+            currentMatchIndex = currentMatchIndex - 1;
+            if (currentMatchIndex < 0) currentMatchIndex = matches.length - 1;
+            updateMatchCount();
+            scrollToCurrentMatch();
+        }
+
+        // Scroll to current match
+        function scrollToCurrentMatch() {
+            if (currentMatchIndex === -1 || matches.length === 0) return;
+
+            const currentMode = document.querySelector('.tab.active').textContent;
+            
+            if (currentMode.includes('Editor')) {
+                // Di editor mode, scroll di textarea
+                const match = matches[currentMatchIndex];
+                const code = codeInput.value;
+                const textBeforeMatch = code.substring(0, match.index);
+                const lineNumber = (textBeforeMatch.match(/\n/g) || []).length + 1;
+                
+                // Scroll ke baris tersebut
+                const lineHeight = 22;
+                codeInput.scrollTop = (lineNumber - 3) * lineHeight;
+                
+                // Select text
+                codeInput.focus();
+                codeInput.setSelectionRange(match.index, match.index + match.length);
+                
+                currentLineSpan.textContent = lineNumber;
+            } else {
+                // Di preview mode, scroll ke highlight yang sesuai
+                const highlights = document.querySelectorAll('.search-highlight');
+                if (highlights.length > 0 && currentMatchIndex < highlights.length) {
+                    // Hapus class active dari semua
+                    highlights.forEach(h => h.classList.remove('active'));
+                    
+                    // Tambah class active ke yang sesuai
+                    highlights[currentMatchIndex].classList.add('active');
+                    
+                    // Scroll ke element
+                    highlights[currentMatchIndex].scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            }
+        }
+
+        // Escape regex
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        // Clear search
+        function clearSearch() {
+            searchInput.value = '';
+            searchTerm = '';
+            matches = [];
+            currentMatchIndex = -1;
+            updatePreview();
+            searchInput.focus();
+            totalMatchesSpan.textContent = '0';
+            currentMatchSpan.textContent = '0';
+            updateNavButtons();
+            
+            // Hapus semua highlight
+            document.querySelectorAll('.search-highlight').forEach(el => {
+                const parent = el.parentNode;
+                parent.replaceChild(document.createTextNode(el.textContent), el);
+                parent.normalize();
+            });
+        }
+
+        // Syntax highlighting
+        function highlightSyntax(code) {
+            // Escape HTML
+            code = code.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;')
+                       .replace(/ /g, '&nbsp;')
+                       .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+
+            // Highlight comments
+            code = code.replace(/(\/\/.*?)(?=&nbsp;|$)/g, '<span class="comment">$1</span>');
+            code = code.replace(/\/\*.*?\*\//g, '<span class="comment">$&</span>');
+
+            // Keywords
+            const keywords = ['function', 'if', 'else', 'for', 'while', 'return', 'class', 'constructor', 'this', 'const', 'let', 'var', 'new', 'true', 'false', 'console'];
+            keywords.forEach(keyword => {
+                const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+                code = code.replace(regex, `<span class="keyword">${keyword}</span>`);
+            });
+
+            // Numbers
+            code = code.replace(/\b(\d+)\b/g, '<span class="number">$1</span>');
+
+            // Strings
+            code = code.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, '<span class="string">"$1"</span>');
+            code = code.replace(/'([^'\\]*(\\.[^'\\]*)*)'/g, '<span class="string">\'$1\'</span>');
+
+            // Function calls
+            code = code.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+
+            // Class names
+            code = code.replace(/class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, 'class <span class="class-name">$1</span>');
+
+            // Properties
+            code = code.replace(/\.([a-zA-Z_][a-zA-Z0-9_]*)/g, '.<span class="property">$1</span>');
+
+            return code;
+        }
+
+        // Highlight search terms
+        function highlightSearchTerms(html) {
+            if (searchTerm === '') return html;
+
+            let processed = html.replace(/&nbsp;/g, ' ');
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processed;
+            
+            const textNodes = [];
+            const walk = document.createTreeWalker(tempDiv, NodeFilter.SHOW_TEXT, null);
+            let node;
+            while (node = walk.nextNode()) {
+                if (node.textContent.trim() !== '') {
+                    textNodes.push(node);
+                }
+            }
+
+            const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
+            let matchCounter = 0;
+            
+            textNodes.forEach(node => {
+                const text = node.textContent;
+                const matches_ = text.match(regex);
+                
+                if (matches_) {
+                    const parts = text.split(regex);
+                    const fragment = document.createDocumentFragment();
+                    
+                    parts.forEach((part, i) => {
+                        if (part) {
+                            fragment.appendChild(document.createTextNode(part));
+                        }
+                        
+                        if (i < parts.length - 1) {
+                            const span = document.createElement('span');
+                            span.className = 'search-highlight';
+                            if (matchCounter === currentMatchIndex) {
+                                span.classList.add('active');
+                            }
+                            span.textContent = matches_[i];
+                            fragment.appendChild(span);
+                            matchCounter++;
+                        }
+                    });
+                    
+                    node.parentNode.replaceChild(fragment, node);
+                }
+            });
+
+            return tempDiv.innerHTML.replace(/ /g, '&nbsp;');
+        }
+
+        function updatePreview() {
+            const code = codeInput.value;
+            
+            // Update line numbers for preview
+            const lines = code.split('\n');
+            let lineNumberHtml = '';
+            for (let i = 1; i <= lines.length; i++) {
+                lineNumberHtml += i + '\n';
+            }
+            previewLineNumbers.innerText = lineNumberHtml;
+
+            // Apply syntax highlighting
+            let highlighted = highlightSyntax(code);
+            
+            // Apply search highlighting
+            highlighted = highlightSearchTerms(highlighted);
+            
+            codePreview.innerHTML = highlighted + '<br>';
+        }
+
+        // Sync scrolling
+        codeInput.addEventListener('scroll', function() {
+            lineNumbers.scrollTop = codeInput.scrollTop;
+            updateCurrentLine();
+        });
+
+        // Auto-update
+        codeInput.addEventListener('input', function() {
+            updateLineNumbers();
+            updatePreview();
+        });
+
+        // Preview panel scroll sync
+        const previewPanel = document.getElementById('previewPanel');
+        previewPanel.addEventListener('scroll', function(e) {
+            previewLineNumbers.scrollTop = e.target.scrollTop;
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+F untuk fokus ke search
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }
+            
+            // F3 untuk next match
+            if (e.key === 'F3' && !e.shiftKey) {
+                e.preventDefault();
+                if (matches.length > 0) {
+                    focusNextMatch();
+                }
+            }
+            
+            // Shift+F3 untuk previous match
+            if (e.key === 'F3' && e.shiftKey) {
+                e.preventDefault();
+                if (matches.length > 0) {
+                    focusPrevMatch();
+                }
+            }
+        });
+
+        // Initial update
+        updateLineNumbers();
+        updatePreview();
+        
+        // Set default search (tapi tidak langsung dijalankan)
+        setTimeout(() => {
+            searchInput.value = 'console';
+            // Jangan langsung cari, biar user yang tekan Cari atau Enter
+        }, 500);
+    </script>
+</body>
+</html>
